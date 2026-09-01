@@ -2,7 +2,7 @@
 
 ARTEMIS analysis environment packaged as both a Docker image and an Apptainer SIF image.
 
-This repository builds the nuclear-physics ARTEMIS framework from the upstream `artemis-dev/artemis` `develop` branch. The container layout, CI flow, portability rules, and Docker-to-Apptainer conversion strategy are documented in the self-contained [CHATGPT_REBUILD_PROMPT.md](docs/CHATGPT_REBUILD_PROMPT.md).
+This repository builds the nuclear-physics ARTEMIS framework from the upstream `artemis-dev/artemis` `develop` branch.
 
 ## Quick start: Docker
 
@@ -191,6 +191,10 @@ Both Docker and SIF images are smoke-tested with:
 /opt/artemis/scripts/check-container.sh
 ```
 
-## Rebuilding or extending this repository with ChatGPT
+## For Developers
 
-Read [docs/CHATGPT_REBUILD_PROMPT.md](docs/CHATGPT_REBUILD_PROMPT.md) first. It is intended to be self-contained: it records the architecture, compatibility decisions, build flow, runtime layout, CI behavior, and maintenance rules needed to recreate or repair this repository without having to consult the original reference repository.
+For development and maintenance of this container, please use **ChatGPT, Codex, or another AI assistant/coding agent** together with the instructions in [`AGENTS.md`](./AGENTS.md).
+
+Before modifying the container, ask the AI agent to read `AGENTS.md` and inspect the current repository files. `AGENTS.md` contains the repository-specific build requirements, ROOT compatibility policy, directory layout, Docker/Apptainer workflow, CI behavior, and maintenance guidelines.
+
+`CHATGPT_REBUILD_PROMPT.md` is not used in this repository. The repository itself and `AGENTS.md` are the authoritative sources for development and maintenance.
