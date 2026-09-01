@@ -21,6 +21,8 @@ ENV CXXFLAGS="-O2 -march=x86-64 -mtune=generic -mno-avx -mno-avx2"
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN dnf -y update && \
+    dnf -y install dnf-plugins-core && \
+    dnf config-manager --set-enabled crb && \
     dnf -y install \
       git gcc gcc-c++ gcc-gfortran make cmake ninja-build pkgconf-pkg-config \
       which findutils diffutils patch tar gzip bzip2 xz unzip \
