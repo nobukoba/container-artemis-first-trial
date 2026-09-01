@@ -9,7 +9,7 @@ This repository builds the nuclear-physics ARTEMIS framework from the upstream `
 Pull the pre-built image from GHCR:
 
 ```bash
-docker pull --platform linux/amd64/v2 ghcr.io/nobukoba/container-artemis-first-trial:latest
+docker pull --platform linux/amd64 ghcr.io/nobukoba/container-artemis-first-trial:latest
 ```
 
 Run it with the helper script:
@@ -134,10 +134,18 @@ To verify the installation:
 The helper builds for:
 
 ```text
-linux/amd64/v2
+linux/amd64
 ```
 
 and creates both timestamped and `latest` tags.
+
+The distributed binaries use the baseline CPU target:
+
+```text
+-O2 -march=x86-64 -mtune=generic -mno-avx -mno-avx2
+```
+
+`-mno-avx -mno-avx2` are intentionally mandatory for Docker-distributed binaries in this repository.
 
 The default parallelism is four jobs. Override it when necessary:
 
@@ -147,9 +155,9 @@ NPROC=8 ./build-docker-image.sh
 
 ## Apple Silicon Mac
 
-The distributed image intentionally targets `linux/amd64/v2`, including on an Apple Silicon Mac. Docker Desktop therefore runs it through its amd64 compatibility/emulation path.
+The distributed image intentionally targets `linux/amd64`, including on an Apple Silicon Mac. Docker Desktop therefore runs it through its amd64 compatibility/emulation path.
 
-The Dockerfile deliberately avoids host-native AVX/AVX2 optimization so that an image produced by GitHub Actions remains portable to older x86-64 Linux hosts.
+The Dockerfile explicitly disables AVX and AVX2 code generation so that an image produced by GitHub Actions remains usable on the intended x86-64 hosts.
 
 Run it in the same way:
 
