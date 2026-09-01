@@ -51,7 +51,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64/v2
+          platforms: linux/amd64
           push: true
           build-args: |
             NPROC=4
@@ -64,9 +64,9 @@ jobs:
       - name: Pull and smoke-test Docker image
         shell: bash
         run: |
-          docker pull --platform linux/amd64/v2 \
+          docker pull --platform linux/amd64 \
             "${{ steps.image.outputs.ref }}:${{ steps.tag.outputs.tag }}"
-          docker run --rm --platform linux/amd64/v2 \
+          docker run --rm --platform linux/amd64 \
             "${{ steps.image.outputs.ref }}:${{ steps.tag.outputs.tag }}" \
             bash -lc '/opt/artemis/scripts/check-container.sh'
 
