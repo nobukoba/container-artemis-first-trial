@@ -96,8 +96,9 @@ RUN cd ${ARTEMIS_ROOT}/src && \
 
 RUN cd ${ARTEMIS_ROOT}/src && \
     git clone --depth 1 --branch ${HIREDIS_VERSION} https://github.com/redis/hiredis.git && \
-    make -C hiredis -j${NPROC} PREFIX=${ARTEMIS_ROOT} && \
-    make -C hiredis PREFIX=${ARTEMIS_ROOT} install
+    make -C hiredis -j${NPROC} PREFIX=${ARTEMIS_ROOT} LIBRARY_PATH=lib && \
+    make -C hiredis PREFIX=${ARTEMIS_ROOT} LIBRARY_PATH=lib install && \
+    test -e ${ARTEMIS_ROOT}/lib/libhiredis.so
 
 RUN cd ${ARTEMIS_ROOT}/src && \
     git clone --depth 1 --branch ${REDIS_PLUS_PLUS_VERSION} https://github.com/sewenew/redis-plus-plus.git && \
