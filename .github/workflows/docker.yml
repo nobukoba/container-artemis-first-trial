@@ -1,0 +1,129 @@
+name: Build Docker and SIF
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "Dockerfile"
+      - "scripts/**"
+      - "*.sh"
+      - ".github/workflows/docker.yml"
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE_NAME: container-artemis-first-trial
+  SIF_NAME: container-artemis-first-trial.sif
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set UTC tag
+        id: tag
+        shell: bash
+        run: echo "tag=$(date -u +%Y%m%d-%H%Mutc)" >> "$GITHUB_OUTPUT"
+
+      - name: Set image name
+        id: image
+        shell: bash
+        run: echo "ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64/v2
+          push: true
+          build-args: |
+            NPROC=4
+          tags: |
+            ${{ steps.image.outputs.ref }}:${{ steps.tag.outputs.tag }}
+            ${{ steps.image.outputs.ref }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Pull and smoke-test Docker image
+        shell: bash
+        run: |
+          docker pull --platform linux/amd64/v2 \
+            "${{ steps.image.outputs.ref }}:${{ steps.tag.outputs.tag }}"
+          docker run --rm --platform linux/amd64/v2 \
+            "${{ steps.image.outputs.ref }}:${{ steps.tag.outputs.tag }}" \
+            bash -lc '/opt/artemis/scripts/check-container.sh'
+
+      - name: Show Docker image size
+        shell: bash
+        run: docker image ls "${{ steps.image.outputs.ref }}:${{ steps.tag.outputs.tag }}"
+
+      - name: Set up Apptainer
+        uses: eWaterCycle/setup-apptainer@v2
+        with:
+          apptainer-version: 1.4.2
+
+      - name: Log in to GHCR from Apptainer
+        shell: bash
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | apptainer registry login \
+            --username "$GHCR_USER" \
+            --password-stdin docker://ghcr.io
+
+      - name: Build SIF
+        shell: bash
+        run: |
+          apptainer build \
+            "${SIF_NAME}" \
+            "docker://${{ steps.image.outputs.ref }}:${{ steps.tag.outputs.tag }}"
+          cp "${SIF_NAME}" "container-artemis-first-trial-${{ steps.tag.outputs.tag }}.sif"
+
+      - name: Smoke test SIF
+        shell: bash
+        run: |
+          apptainer exec "${SIF_NAME}" \
+            bash -lc '/opt/artemis/scripts/check-container.sh'
+
+      - name: Upload SIF artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-artemis-first-trial-${{ steps.tag.outputs.tag }}-sif
+          path: |
+            container-artemis-first-trial.sif
+            container-artemis-first-trial-${{ steps.tag.outputs.tag }}.sif
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Publish latest SIF release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest SIF image
+          prerelease: false
+          make_latest: true
+          files: |
+            container-artemis-first-trial.sif
+            container-artemis-first-trial-${{ steps.tag.outputs.tag }}.sif
+          body: |
+            Automatically built from the latest successful main-branch container build.
+            Build: ${{ steps.tag.outputs.tag }}
