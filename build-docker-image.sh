@@ -6,7 +6,7 @@ NPROC="${NPROC:-4}"
 STAMP="${STAMP:-$(date -u +%Y%m%d-%H%Mutc)}"
 
 docker build \
-  --platform linux/amd64/v2 \
+  --platform linux/amd64 \
   --progress=plain \
   --build-arg NPROC="${NPROC}" \
   -t "${IMAGE_NAME}:${STAMP}" \
