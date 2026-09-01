@@ -39,15 +39,25 @@ container-artemis-first-trial.sif
 
 ## Important build requirements
 
-1. Use AlmaLinux 10 as the base operating system unless the repository is intentionally migrated.
+1. Use the AlmaLinux version recorded in the current Dockerfile. If the base OS is intentionally migrated, keep this file, the Dockerfile, README, helper scripts, and CI synchronized.
 
-2. Target `x86-64-v2` / `linux/amd64/v2` so that the image can also run under x86_64 emulation on Apple Silicon Macs.
+2. Use the Docker platform recorded in the current workflow/build helper. If the platform is changed from `linux/amd64/v2` to `linux/amd64`, update all related files consistently.
 
-3. Do not compile distributed binaries with `-march=native`. Avoid dependencies on AVX or AVX2. The current portability policy is effectively:
+3. **AVX and AVX2 must be disabled for Docker-distributed binaries. This is a mandatory runtime compatibility requirement, not an optional optimization preference.** Do not compile distributed binaries with `-march=native`, and do not remove either of these flags:
 
 ```text
--O2 -march=x86-64-v2 -mtune=generic -mno-avx -mno-avx2
+-mno-avx -mno-avx2
 ```
+
+If the Docker platform is `linux/amd64`, use a baseline CPU target such as:
+
+```text
+-O2 -march=x86-64 -mtune=generic -mno-avx -mno-avx2
+```
+
+If another CPU baseline is deliberately selected, `-mno-avx -mno-avx2` must still be preserved unless the user explicitly changes this requirement.
+
+Apply this policy consistently to global `CFLAGS` / `CXXFLAGS` and to explicit ROOT CMake release flags such as `CMAKE_C_FLAGS_RELEASE` / `CMAKE_CXX_FLAGS_RELEASE`.
 
 4. Install image-provided software under `/opt/artemis` and use `/work` as the persistent writable user/development area.
 
@@ -191,10 +201,11 @@ Dockerfile -> Docker image -> GHCR -> Apptainer SIF
 The local Docker build helper should:
 
 - default to image name `container-artemis-first-trial`;
-- target `linux/amd64/v2`;
+- use the same Docker platform as CI;
 - create a UTC timestamped tag;
 - also create/update `latest`;
-- allow `NPROC` to be overridden.
+- allow `NPROC` to be overridden;
+- preserve `-mno-avx -mno-avx2` in all distributed builds.
 
 The Docker runtime helper should mount a host work directory at `/work` and preserve X11 support where practical.
 
@@ -300,8 +311,8 @@ When working on this repository:
 - identify the specific cause of a build/runtime problem before making broad changes;
 - prefer targeted fixes over global compiler or dependency changes;
 - preserve working behavior unrelated to the requested change;
-- preserve AlmaLinux 10 unless explicitly changed;
-- preserve `linux/amd64/v2` portability;
+- preserve the base OS and Docker platform recorded in the current repository unless explicitly changed;
+- **always preserve `-mno-avx -mno-avx2` for Docker-distributed binaries unless the user explicitly changes this requirement;**
 - preserve `/opt/artemis` for installed software and `/work` for writable files;
 - keep ROOT pinned to `v6-32-06` unless a version change is explicitly investigated and requested;
 - preserve the intended ZeroMQ and Redis ARTEMIS configuration unless explicitly changed;
