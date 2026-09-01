@@ -78,9 +78,13 @@ The image itself should be treated as immutable. Analysis files, user code, outp
 
 ## Included software
 
+The intended base environment is **AlmaLinux 9**.
+
+AlmaLinux 9 is intentionally preferred for the foreseeable future. This container combines ARTEMIS, ROOT, and several supporting C/C++ libraries, and for this environment build stability and compatibility are more important than adopting the newest major OS release. Moving to AlmaLinux 10 also changes the compiler and system-library environment and can expose additional build or source-compatibility problems in ROOT, ARTEMIS, or their dependencies. Therefore, AlmaLinux 10 should not be adopted simply because it is newer; a future migration should be made only after the complete software stack has been tested successfully and there is a concrete benefit to the change.
+
 The image builds and installs:
 
-- AlmaLinux 10 base environment
+- AlmaLinux 9 base environment
 - ROOT **6.32.06** (`v6-32-06`)
 - ARTEMIS (`artemis-dev/artemis`, `develop` branch by default)
 - yaml-cpp
