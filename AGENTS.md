@@ -39,7 +39,7 @@ container-artemis-first-trial.sif
 
 ## Important build requirements
 
-1. Use the AlmaLinux version recorded in the current Dockerfile. If the base OS is intentionally migrated, keep this file, the Dockerfile, README, helper scripts, and CI synchronized.
+1. **Use AlmaLinux 9 as the preferred base operating system for the foreseeable future.** Stability and compatibility with the existing ARTEMIS/ROOT software stack are more important than moving to AlmaLinux 10. Do not migrate this repository to AlmaLinux 10 merely because it is newer. Reconsider a newer major AlmaLinux release only after the complete ROOT + ARTEMIS + dependency stack has been explicitly tested and there is a concrete reason to migrate.
 
 2. Use the Docker platform recorded in the current workflow/build helper. If the platform is changed from `linux/amd64/v2` to `linux/amd64`, update all related files consistently.
 
@@ -311,7 +311,8 @@ When working on this repository:
 - identify the specific cause of a build/runtime problem before making broad changes;
 - prefer targeted fixes over global compiler or dependency changes;
 - preserve working behavior unrelated to the requested change;
-- preserve the base OS and Docker platform recorded in the current repository unless explicitly changed;
+- **prefer AlmaLinux 9 for the foreseeable future; do not migrate to AlmaLinux 10 just because it is newer;**
+- preserve the Docker platform recorded in the current repository unless explicitly changed;
 - **always preserve `-mno-avx -mno-avx2` for Docker-distributed binaries unless the user explicitly changes this requirement;**
 - preserve `/opt/artemis` for installed software and `/work` for writable files;
 - keep ROOT pinned to `v6-32-06` unless a version change is explicitly investigated and requested;
