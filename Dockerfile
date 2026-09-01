@@ -65,9 +65,7 @@ RUN cd ${ARTEMIS_ROOT}/src && \
       -Dsqlite=ON \
       -Dssl=ON \
       -Dx11=ON \
-      -Dopengl=ON \
-      -Dminuit2=ON \
-      -Dgeometry=ON && \
+      -Dopengl=ON && \
     cmake --build root-build -j${NPROC} && \
     cmake --install root-build
 
