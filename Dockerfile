@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM quay.io/almalinuxorg/10-base:10
+FROM quay.io/almalinuxorg/9-base:9
 
 ARG NPROC=4
 ARG ROOT_VERSION=v6-32-06
@@ -15,8 +15,8 @@ ENV PATH=/opt/artemis/bin:/opt/artemis/root/bin:${PATH}
 ENV LD_LIBRARY_PATH=/opt/artemis/lib:/opt/artemis/lib64:/opt/artemis/root/lib
 ENV CMAKE_PREFIX_PATH=/opt/artemis:/opt/artemis/root
 ENV PKG_CONFIG_PATH=/opt/artemis/lib/pkgconfig:/opt/artemis/lib64/pkgconfig
-ENV CFLAGS="-O2 -march=x86-64-v2 -mtune=generic -mno-avx -mno-avx2"
-ENV CXXFLAGS="-O2 -march=x86-64-v2 -mtune=generic -mno-avx -mno-avx2"
+ENV CFLAGS="-O2 -march=x86-64 -mtune=generic -mno-avx -mno-avx2"
+ENV CXXFLAGS="-O2 -march=x86-64 -mtune=generic -mno-avx -mno-avx2"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -49,8 +49,8 @@ RUN cd ${ARTEMIS_ROOT}/src && \
     cmake -S root -B root-build \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=${ROOTSYS} \
-      -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG -march=x86-64-v2 -mtune=generic -mno-avx -mno-avx2" \
-      -DCMAKE_CXX_FLAGS_RELEASE="-O2 -DNDEBUG -march=x86-64-v2 -mtune=generic -mno-avx -mno-avx2" \
+      -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG -march=x86-64 -mtune=generic -mno-avx -mno-avx2" \
+      -DCMAKE_CXX_FLAGS_RELEASE="-O2 -DNDEBUG -march=x86-64 -mtune=generic -mno-avx -mno-avx2" \
       -Dgnuinstall=ON \
       -Dtesting=OFF \
       -Dtmva=OFF \
@@ -74,6 +74,7 @@ RUN cd ${ARTEMIS_ROOT}/src && \
     cmake -S yaml-cpp -B yaml-cpp/build \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} \
+      -DCMAKE_INSTALL_LIBDIR=lib \
       -DYAML_BUILD_SHARED_LIBS=ON \
       -DYAML_CPP_BUILD_TESTS=OFF \
       -DYAML_CPP_BUILD_TOOLS=OFF && \
@@ -85,6 +86,7 @@ RUN cd ${ARTEMIS_ROOT}/src && \
     cmake -S libzmq -B libzmq/build \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} \
+      -DCMAKE_INSTALL_LIBDIR=lib \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       -DBUILD_TESTS=OFF -DENABLE_DRAFTS=OFF && \
     cmake --build libzmq/build -j${NPROC} && \
@@ -101,6 +103,7 @@ RUN cd ${ARTEMIS_ROOT}/src && \
     cmake -S redis-plus-plus -B redis-plus-plus/build \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} \
+      -DCMAKE_INSTALL_LIBDIR=lib \
       -DCMAKE_PREFIX_PATH=${ARTEMIS_ROOT} \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       -DREDIS_PLUS_PLUS_CXX_STANDARD=17 \
@@ -140,7 +143,7 @@ RUN chmod -R a+rX ${ARTEMIS_ROOT}/scripts && \
     ldconfig && \
     root-config --version && \
     test -x ${ARTEMIS_ROOT}/bin/artemis && \
-    ${ARTEMIS_ROOT}/bin/artemis --help >/dev/null 2>&1 || true
+    (${ARTEMIS_ROOT}/bin/artemis --help >/dev/null 2>&1 || true)
 
 WORKDIR /work
 CMD ["/bin/bash", "-l"]
