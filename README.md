@@ -2,7 +2,7 @@
 
 ARTEMIS analysis environment packaged as both a Docker image and an Apptainer SIF image.
 
-This repository follows the container layout and CI strategy used in `nobukoba/container-interfacing-nestdaq-eicrecon`, while building the nuclear-physics ARTEMIS framework from the upstream `artemis-dev/artemis` `develop` branch.
+This repository builds the nuclear-physics ARTEMIS framework from the upstream `artemis-dev/artemis` `develop` branch. The container layout, CI flow, portability rules, and Docker-to-Apptainer conversion strategy are documented in the self-contained [CHATGPT_REBUILD_PROMPT.md](docs/CHATGPT_REBUILD_PROMPT.md).
 
 ## Quick start: Docker
 
@@ -81,13 +81,15 @@ The image itself should be treated as immutable. Analysis files, user code, outp
 The image builds and installs:
 
 - AlmaLinux 10 base environment
-- ROOT 6
+- ROOT **6.32.06** (`v6-32-06`)
 - ARTEMIS (`artemis-dev/artemis`, `develop` branch by default)
 - yaml-cpp
 - ZeroMQ / libzmq
 - hiredis
 - redis-plus-plus
 - OpenMPI development environment
+
+ROOT is intentionally pinned rather than tracking the newest ROOT release automatically. ARTEMIS compatibility is more important than using the newest ROOT version. Any ROOT-version change should be treated as a compatibility change and tested explicitly with ARTEMIS.
 
 ARTEMIS is configured with:
 
@@ -191,10 +193,4 @@ Both Docker and SIF images are smoke-tested with:
 
 ## Rebuilding or extending this repository with ChatGPT
 
-See:
-
-```text
-docs/CHATGPT_REBUILD_PROMPT.md
-```
-
-It records the intended architecture and the constraints that should be preserved when updating the container.
+Read [docs/CHATGPT_REBUILD_PROMPT.md](docs/CHATGPT_REBUILD_PROMPT.md) first. It is intended to be self-contained: it records the architecture, compatibility decisions, build flow, runtime layout, CI behavior, and maintenance rules needed to recreate or repair this repository without having to consult the original reference repository.
