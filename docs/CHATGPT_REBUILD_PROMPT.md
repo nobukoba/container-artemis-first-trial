@@ -103,10 +103,30 @@ ARG ROOT_VERSION=v6-32-06
 
 ROOT 6.32 is an LTS series, but the important maintenance rule here is compatibility, not simply LTS status. Keep `v6-32-06` pinned until a different ROOT release has been explicitly tested with this ARTEMIS build.
 
+### ROOT 6.32 CMake-option compatibility
+
+Do not blindly reuse CMake feature switches from older ROOT releases.
+
+With ROOT 6.32.06, passing this option is a **fatal configuration error**:
+
+```text
+-Dminuit2=ON
+```
+
+ROOT reports:
+
+```text
+Option 'minuit2' is no longer supported in ROOT 6.32.06.
+```
+
+Therefore the ROOT 6.32.06 build in this repository must **not** pass `-Dminuit2=ON`. Minuit2 is still needed by ARTEMIS as a ROOT component, but for this ROOT release it must not be enabled using that obsolete CMake option.
+
+Similarly, avoid carrying forward undocumented or obsolete ROOT CMake switches simply because they existed in an older recipe. When a ROOT configure step fails, inspect ROOT's exact CMake error and remove or replace only the option that ROOT says is unsupported.
+
 If ROOT is changed, verify at minimum:
 
 ```text
-1. ROOT itself builds successfully.
+1. ROOT itself configures and builds successfully.
 2. root-config reports the intended version.
 3. ARTEMIS configures against that ROOT installation.
 4. ARTEMIS compiles and installs successfully.
@@ -116,7 +136,7 @@ If ROOT is changed, verify at minimum:
 
 Do not silently replace ROOT 6.32.06 with the latest ROOT tag while fixing an unrelated build problem.
 
-ARTEMIS requires ROOT components including RIO, Net, Physics, Geom, Minuit, Minuit2, and Gui. Preserve the corresponding ROOT capabilities when changing ROOT build options.
+ARTEMIS requires ROOT components including RIO, Net, Physics, Geom, Minuit, Minuit2, and Gui. Preserve those capabilities when changing ROOT, while using CMake switches appropriate for the selected ROOT version.
 
 ## ARTEMIS source and build
 
@@ -311,18 +331,44 @@ Where useful, also print `root-config --version` so that CI makes an accidental 
 
 A successful Docker build alone is not sufficient. The SIF created from it must also pass the container check.
 
+## Diagnosing CI failures
+
+The final Buildx summary often contains only a wrapper message such as:
+
+```text
+process "..." did not complete successfully: exit code: 1
+```
+
+That line usually identifies the Docker `RUN` instruction that failed, but it does **not** identify the real compiler or CMake error.
+
+For CI repair:
+
+1. inspect the failed GitHub Actions job log or Buildx `.dockerbuild` record;
+2. locate the first concrete `CMake Error`, `error:`, `fatal error:`, or failed command inside the affected build stage;
+3. patch that exact cause rather than changing several dependency versions at once;
+4. rerun CI and continue from the next concrete failure, if any.
+
+For example, the ROOT 6.32.06 failure encountered in this repository was diagnosed from the Buildx record as:
+
+```text
+CMake Error at cmake/modules/RootBuildOptions.cmake:402 (message):
+  >>> Option 'minuit2' is no longer supported in ROOT 6.32.06.
+```
+
+The correct targeted repair was to remove `-Dminuit2=ON`, not to replace ROOT with the newest release.
+
 ## Maintenance rules for ChatGPT
 
 When asked to modify or repair this repository:
 
 1. Inspect the current repository files before editing them.
-2. Inspect the exact failing GitHub Actions log when a CI build has failed; do not guess broadly when the log identifies a concrete package, compiler, CMake, or runtime problem.
+2. Inspect the exact failing GitHub Actions log or Buildx build record when CI has failed; do not infer the root cause from the final Buildx wrapper line alone.
 3. Preserve AlmaLinux 10 unless the user explicitly changes that requirement.
 4. Preserve `linux/amd64/v2` portability and avoid host-native CPU optimization.
 5. Preserve `/opt/artemis` for installed image software and `/work` for writable user files.
 6. Keep ROOT pinned to `v6-32-06` unless compatibility with another version has actually been investigated and the user wants the change.
 7. Treat ROOT version changes as ARTEMIS compatibility changes, not routine upgrades.
-8. Keep ARTEMIS's required ROOT components enabled.
+8. Keep ARTEMIS's required ROOT capabilities available, but use ROOT-version-appropriate CMake switches; specifically, do not pass obsolete `-Dminuit2=ON` to ROOT 6.32.06.
 9. Preserve the intended `BUILD_WITH_ZMQ=ON` and `BUILD_WITH_REDIS=ON` configuration unless the user deliberately changes the online-integration goal.
 10. Keep yaml-cpp, libzmq, hiredis, and redis-plus-plus discoverable by ARTEMIS.
 11. Keep Docker, Apptainer, README, scripts, image names, CPU target, paths, and CI configuration synchronized.
@@ -357,6 +403,6 @@ Read docs/CHATGPT_REBUILD_PROMPT.md in this repository first and treat it as the
 maintenance specification. Then inspect the current repository and the relevant
 upstream ARTEMIS files. Preserve the documented architecture and compatibility
 choices unless I explicitly ask to change them. If CI is failing, inspect the
-exact workflow/job log and make the smallest justified fix. Report exactly what
-you changed and what still needs testing.
+exact workflow/job log or Buildx build record and make the smallest justified
+fix. Report exactly what you changed and what still needs testing.
 ```
