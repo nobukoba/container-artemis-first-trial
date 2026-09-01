@@ -55,7 +55,7 @@ RUN cd ${ARTEMIS_ROOT}/src && \
       -DCMAKE_CXX_FLAGS_RELEASE="-O2 -DNDEBUG -march=x86-64 -mtune=generic -mno-avx -mno-avx2" \
       -Dgnuinstall=ON \
       -Dtesting=OFF \
-      -Dtmva=OFF \
+      -Dtmva=ON \
       -Droofit=OFF \
       -Dpyroot=OFF \
       -Dwebgui=OFF \
