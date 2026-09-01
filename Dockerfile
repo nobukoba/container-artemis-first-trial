@@ -26,7 +26,7 @@ RUN dnf -y update && \
     dnf -y install \
       git gcc gcc-c++ gcc-gfortran make cmake ninja-build pkgconf-pkg-config \
       which findutils diffutils patch tar gzip bzip2 xz unzip \
-      curl wget ca-certificates python3 python3-pip rsync \
+      wget ca-certificates python3 python3-pip rsync \
       binutils file procps-ng tmux emacs vim \
       openssl-devel zlib-devel xz-devel bzip2-devel pcre2-devel \
       libX11-devel libXext-devel libXft-devel libXpm-devel libXrender-devel \
