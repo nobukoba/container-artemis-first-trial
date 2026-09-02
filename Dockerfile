@@ -141,6 +141,7 @@ EOF
 
 COPY scripts/ ${ARTEMIS_ROOT}/scripts/
 RUN chmod -R a+rX ${ARTEMIS_ROOT}/scripts && \
+    find ${ARTEMIS_ROOT}/scripts -type f -name '*.sh' -exec chmod a+x {} + && \
     printf '%s\n' '/opt/artemis/lib' '/opt/artemis/lib64' '/opt/artemis/root/lib' \
       > /etc/ld.so.conf.d/artemis.conf && \
     ldconfig && \
