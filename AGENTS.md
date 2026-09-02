@@ -1,80 +1,47 @@
 # Repository instructions for AI agents
 
-This file contains the instructions and design constraints that AI assistants and coding agents should read before rebuilding or modifying this repository.
+This file is the persistent hand-off note for ChatGPT, Codex, and other coding agents working on this repository. Always inspect the repository itself before editing; `Dockerfile`, workflow files, helper scripts, and `README.md` are authoritative for the current implementation.
 
-The repository itself is the authoritative source for the current package versions, scripts, build options, and runtime configuration. Before making changes, inspect the current repository, especially:
+## Purpose and build flow
 
-- `Dockerfile`
-- `README.md`
-- `.github/workflows/docker.yml`
-- `build-docker-image.sh`
-- `run-docker-container.sh`
-- `login-docker-container.sh`
-- `build-apptainer-image.sh`
-- `run-apptainer-container.sh`
-- `scripts/check-container.sh`
+This repository provides the ARTEMIS analysis environment as both a Docker image and an Apptainer/Singularity SIF image.
 
-Do not recreate the environment only from this document. Preserve the current repository behavior unless a change is necessary.
+The intended distribution flow is:
 
-## Purpose
+```text
+Dockerfile -> Docker image -> GHCR -> Apptainer SIF
+```
 
-This repository provides an ARTEMIS analysis environment as both:
-
-- a Docker image published to GitHub Container Registry (GHCR), and
-- an Apptainer/Singularity SIF image generated from that exact Docker image.
-
-The Docker and SIF images should contain the same software stack. Avoid maintaining separate dependency recipes for Docker and Apptainer unless there is a compelling technical reason.
-
-The expected image name is:
+Expected image and SIF names:
 
 ```text
 ghcr.io/nobukoba/container-artemis-first-trial
-```
-
-The expected SIF name is:
-
-```text
 container-artemis-first-trial.sif
 ```
 
-## Important build requirements
+Docker and SIF should contain the same software stack. Do not maintain separate dependency recipes unless there is a compelling technical reason.
 
-1. **Use AlmaLinux 9 as the preferred base operating system for the foreseeable future.** Stability and compatibility with the existing ARTEMIS/ROOT software stack are more important than moving to AlmaLinux 10. Do not migrate this repository to AlmaLinux 10 merely because it is newer. Reconsider a newer major AlmaLinux release only after the complete ROOT + ARTEMIS + dependency stack has been explicitly tested and there is a concrete reason to migrate.
+## Non-negotiable build requirements
 
-2. Use the Docker platform recorded in the current workflow/build helper. If the platform is changed from `linux/amd64/v2` to `linux/amd64`, update all related files consistently.
-
-3. **AVX and AVX2 must be disabled for Docker-distributed binaries. This is a mandatory runtime compatibility requirement, not an optional optimization preference.** Do not compile distributed binaries with `-march=native`, and do not remove either of these flags:
+- Use **AlmaLinux 9** as the preferred base OS for the foreseeable future. Stability and compatibility with ARTEMIS/ROOT are more important than moving to AlmaLinux 10 merely because it is newer.
+- Distributed Docker binaries must not require AVX or AVX2. Preserve:
 
 ```text
 -mno-avx -mno-avx2
 ```
 
-If the Docker platform is `linux/amd64`, use a baseline CPU target such as:
+- Current baseline CPU flags are:
 
 ```text
 -O2 -march=x86-64 -mtune=generic -mno-avx -mno-avx2
 ```
 
-If another CPU baseline is deliberately selected, `-mno-avx -mno-avx2` must still be preserved unless the user explicitly changes this requirement.
-
-Apply this policy consistently to global `CFLAGS` / `CXXFLAGS` and to explicit ROOT CMake release flags such as `CMAKE_C_FLAGS_RELEASE` / `CMAKE_CXX_FLAGS_RELEASE`.
-
-4. Install image-provided software under `/opt/artemis` and use `/work` as the persistent writable user/development area.
-
-5. Keep ROOT pinned to the ARTEMIS-compatible version currently recorded in the Dockerfile. Do not automatically update ROOT to the latest stable release.
-
-6. ROOT is currently pinned to:
-
-```text
-ROOT 6.32.06
-Git tag: v6-32-06
-```
-
-7. ROOT 6.32.06 must not be configured with the obsolete CMake option `-Dminuit2=ON`. In this ROOT release the Minuit2 component is provided without that old build switch. Likewise, do not add old ROOT CMake switches unless they are known to exist for the pinned ROOT version.
-
-8. ARTEMIS uses the `artemis-dev/artemis` `develop` branch by default and is built with C++17.
-
-9. Preserve the intended ARTEMIS configuration unless explicitly changed:
+Apply the AVX policy both to global `CFLAGS` / `CXXFLAGS` and explicit ROOT release flags.
+- Do not use `-march=native` for distributed images.
+- Keep ROOT pinned to **6.32.06** (`v6-32-06`) unless a different ROOT release is explicitly investigated and tested with ARTEMIS.
+- ROOT 6.32.06 must not be configured with obsolete switches such as `-Dminuit2=ON`.
+- ARTEMIS normally uses `artemis-dev/artemis` branch `develop` and C++17.
+- Preserve the ARTEMIS configuration unless explicitly changed:
 
 ```text
 BUILD_GET=OFF
@@ -82,57 +49,9 @@ BUILD_WITH_ZMQ=ON
 BUILD_WITH_REDIS=ON
 ```
 
-10. Keep yaml-cpp, libzmq, hiredis, and redis-plus-plus discoverable by ARTEMIS.
+- Prefer small targeted compatibility fixes over broad compiler, ROOT, dependency, or OS upgrades.
 
-11. Prefer small targeted compatibility fixes over broad compiler, ROOT, or dependency upgrades.
-
-## ROOT compatibility policy
-
-ARTEMIS compatibility is more important than using the newest ROOT release. A newer ROOT version can introduce source, CMake, ABI, or runtime incompatibilities.
-
-Keep this baseline pinned until a different version has been explicitly tested:
-
-```dockerfile
-ARG ROOT_VERSION=v6-32-06
-```
-
-If ROOT is changed, verify at minimum:
-
-```text
-1. ROOT configures and builds successfully.
-2. root-config reports the intended version.
-3. ARTEMIS configures against that ROOT installation.
-4. ARTEMIS compiles and installs successfully.
-5. ARTEMIS starts successfully in the built container.
-6. Required ROOT/ARTEMIS GUI functionality still works.
-```
-
-ARTEMIS requires ROOT components including RIO, Net, Physics, Geom, Minuit, Minuit2, and Gui. Preserve those capabilities, but do not assume that each component corresponds to a current ROOT CMake on/off option.
-
-## ARTEMIS source and build
-
-The ARTEMIS project is:
-
-```text
-https://github.com/artemis-dev/artemis
-```
-
-Use the `develop` branch by default unless the repository deliberately pins another tested revision.
-
-The build is conceptually:
-
-```bash
-git clone -b develop https://github.com/artemis-dev/artemis.git
-cmake -S artemis -B artemis/build ...
-cmake --build artemis/build
-cmake --install artemis/build
-```
-
-Install ARTEMIS into `/opt/artemis`.
-
-## Required supporting libraries
-
-The image currently builds and installs:
+## Current pinned supporting libraries
 
 ```text
 yaml-cpp          0.8.0
@@ -141,15 +60,11 @@ hiredis           v1.1.0
 redis-plus-plus   1.3.6
 ```
 
-These versions are currently pinned in the Dockerfile for reproducibility.
+ARTEMIS Redis support needs both hiredis and redis-plus-plus to be discoverable. The Dockerfile currently installs hiredis under `/opt/artemis/lib`. redis-plus-plus currently receives a targeted `<cstdint>` compatibility patch; do not remove it without confirming it is unnecessary.
 
-ARTEMIS's Redis build path expects both redis-plus-plus and hiredis. Keep `CMAKE_PREFIX_PATH`, `PKG_CONFIG_PATH`, library search paths, and installation prefixes synchronized.
+## Filesystem layout
 
-There is currently a small compatibility patch applied to redis-plus-plus to add the required `<cstdint>` include. Do not remove targeted compatibility fixes without first verifying they are no longer needed.
-
-## Container layout
-
-Use `/opt/artemis` as the image-provided software area:
+Image-provided software belongs under:
 
 ```text
 /opt/artemis/
@@ -162,7 +77,7 @@ Use `/opt/artemis` as the image-provided software area:
   scripts/
 ```
 
-Use `/work` as the writable user and development area:
+Writable user/development files belong under:
 
 ```text
 /work/
@@ -172,11 +87,9 @@ Use `/work` as the writable user and development area:
   scripts/
 ```
 
-The Docker and Apptainer runtime helpers should bind a host work directory to `/work`.
+Docker and Apptainer helpers should bind the host working directory to `/work`.
 
-## Environment inside the container
-
-The expected core environment is:
+Expected core environment:
 
 ```bash
 ARTEMIS_ROOT=/opt/artemis
@@ -186,42 +99,9 @@ CMAKE_PREFIX_PATH=/opt/artemis:/opt/artemis/root
 PKG_CONFIG_PATH=/opt/artemis/lib/pkgconfig:/opt/artemis/lib64/pkgconfig
 ```
 
-The ARTEMIS and ROOT library directories must be available through `LD_LIBRARY_PATH` and/or `ldconfig`.
+ARTEMIS and ROOT libraries must be available through `LD_LIBRARY_PATH` and/or `ldconfig`. Source `/opt/artemis/bin/thisartemis.sh` automatically for login shells when it exists.
 
-If `/opt/artemis/bin/thisartemis.sh` exists, source it automatically for login shells.
-
-## Docker and Apptainer policy
-
-The preferred distribution flow is:
-
-```text
-Dockerfile -> Docker image -> GHCR -> Apptainer SIF
-```
-
-The local Docker build helper should:
-
-- default to image name `container-artemis-first-trial`;
-- use the same Docker platform as CI;
-- create a UTC timestamped tag;
-- also create/update `latest`;
-- allow `NPROC` to be overridden;
-- preserve `-mno-avx -mno-avx2` in all distributed builds.
-
-The Docker runtime helper should mount a host work directory at `/work` and preserve X11 support where practical.
-
-On macOS, Docker Desktop commonly uses:
-
-```text
-DISPLAY=host.docker.internal:0
-```
-
-with XQuartz or another X server for ROOT/ARTEMIS X11 windows.
-
-On Linux, forward `DISPLAY` and bind `/tmp/.X11-unix` when available.
-
-Build the SIF from the already-built Docker image, preferably from the exact immutable timestamped tag used by CI.
-
-## GitHub Actions and images
+## CI / distribution expectations
 
 GitHub Actions should build and publish:
 
@@ -230,67 +110,96 @@ ghcr.io/nobukoba/container-artemis-first-trial:latest
 ghcr.io/nobukoba/container-artemis-first-trial:YYYYMMDD-HHMMutc
 ```
 
-Generate the timestamp in UTC using:
-
-```bash
-date -u +%Y%m%d-%H%Mutc
-```
-
-The workflow should then create:
+The workflow then builds the SIF from the exact timestamped Docker image and publishes:
 
 ```text
 container-artemis-first-trial.sif
 container-artemis-first-trial-YYYYMMDD-HHMMutc.sif
 ```
 
-from the exact timestamped Docker image.
+Keep permissions sufficient for GHCR and release publishing (`packages: write`, `contents: write`).
 
-Publish the SIF files as workflow artifacts and in the rolling `latest` GitHub release.
-
-Keep GitHub Actions permissions sufficient for GHCR publishing and release creation, including `packages: write` and `contents: write` where needed.
+Current GitHub-hosted runners provide four CPUs, so `NPROC=4` matches the available runner cores. Local builds may override `NPROC`.
 
 ## Smoke tests
 
-Both Docker and SIF images must be smoke-tested with:
+Both Docker and SIF must pass:
 
 ```bash
 /opt/artemis/scripts/check-container.sh
 ```
 
-The check should verify important installation facts such as:
+The check should verify at least ROOT, ARTEMIS, `thisartemis.sh`, yaml-cpp, libzmq, hiredis, redis-plus-plus, and ARTEMIS CMake installation metadata.
 
-- `root-config` is available and reports the expected ROOT version;
-- the ARTEMIS executable is installed;
-- `thisartemis.sh` exists when expected;
-- yaml-cpp is discoverable;
-- libzmq is discoverable;
-- hiredis is discoverable;
-- redis-plus-plus is discoverable;
-- ARTEMIS CMake package/configuration files are installed.
+Container-side shell scripts copied into `/opt/artemis/scripts` must be executable. The Dockerfile currently fixes permissions with:
 
-A successful Docker build alone is not sufficient. The generated SIF should also pass the container check.
+```bash
+chmod -R a+rX /opt/artemis/scripts
+find /opt/artemis/scripts -type f -name '*.sh' -exec chmod a+x {} +
+```
 
-## Diagnosing failed builds
+Do not regress this: `chmod -R a+rX` by itself does **not** make a non-executable regular file executable because capital `X` only sets execute for directories or files that already had an execute bit.
 
-When GitHub Actions fails, inspect the exact workflow/job log or Docker Buildx `.dockerbuild` build record rather than relying only on the final `exit code: 1` summary.
+## Build troubleshooting history / current state
 
-Determine whether the failure occurred during:
+This section records important completed troubleshooting so future agents do not repeat it.
+
+### 2026-09-02: ROOT / ARTEMIS build reached a successful Docker image
+
+The build on commit `499897affc079eddb4d46c9dc446bc5caadd819f` successfully completed all Docker build stages, including ROOT 6.32.06, yaml-cpp, libzmq, hiredis, redis-plus-plus, and ARTEMIS. The resulting image was pushed successfully to GHCR.
+
+That is an important milestone: the current AlmaLinux 9 + ROOT 6.32.06 + ARTEMIS `develop` dependency recipe is capable of producing a complete Docker image. Do not undo those compatibility fixes unless a specific reason is found.
+
+### 2026-09-02: smoke test failure was permissions-only
+
+GitHub Actions run `33541798740`, attempt 2, failed **after** the Docker image had built and been pushed. The first concrete error was:
+
+```text
+bash: line 1: /opt/artemis/scripts/check-container.sh: Permission denied
+Process completed with exit code 126
+```
+
+This was not a ROOT, ARTEMIS, Redis, ZeroMQ, compiler, or linker failure. The cause was that the Dockerfile used:
+
+```bash
+chmod -R a+rX /opt/artemis/scripts
+```
+
+but `scripts/check-container.sh` had no execute bit in the copied source. Capital `X` therefore did not add execute permission to that regular file.
+
+Commit `91c5ff44ec21fb6ae9507b8644d249d3139dbfa8` fixes this by explicitly making copied `*.sh` files executable using `find ... -exec chmod a+x`.
+
+A new CI run (`33580189516`) was automatically started from that fix. At the time this hand-off entry was written, that run was still in progress. The next agent should inspect that run before making further changes.
+
+### Earlier compatibility decisions to preserve
+
+- AlmaLinux 9 was selected instead of AlmaLinux 10 for the current ARTEMIS stack.
+- ROOT was pinned to `v6-32-06`.
+- Obsolete ROOT CMake switch `-Dminuit2=ON` was removed.
+- CPU compatibility flags were changed to an x86-64 baseline with explicit `-mno-avx -mno-avx2`.
+- hiredis installation was aligned with `/opt/artemis/lib` so ARTEMIS/redis-plus-plus can discover it.
+- redis-plus-plus receives a narrow `<cstdint>` compatibility patch.
+
+## Diagnosing future failures
+
+When CI fails, inspect the exact workflow/job log rather than the final `exit code` summary. Classify the first real failure as one of:
 
 ```text
 CMake configure
 compilation
 installation
 dependency discovery
+container startup
 runtime smoke test
+Apptainer/SIF conversion
+release publishing
 ```
 
-Use the first concrete compiler or CMake error as the starting point.
+Use the first concrete compiler/CMake/shell error as the starting point. A successful Docker build does not imply the runtime smoke test or SIF build has succeeded.
 
-For example, ROOT 6.32.06 rejects the obsolete `-Dminuit2=ON` CMake option. The correct fix is to remove that option, not to change ROOT versions broadly.
+## User-facing helper scripts
 
-## Repository-level helper scripts
-
-Keep the main user-facing helper scripts easy to discover:
+Keep these easy to discover and synchronized with README/CI:
 
 ```text
 build-docker-image.sh
@@ -300,32 +209,20 @@ build-apptainer-image.sh
 run-apptainer-container.sh
 ```
 
-Internal implementation helpers may live under `scripts/` when appropriate.
+On macOS, ROOT/ARTEMIS X11 usage normally relies on an X server such as XQuartz and `DISPLAY=host.docker.internal:0`. On Linux, forward `DISPLAY` and `/tmp/.X11-unix` where available.
 
-## How AI agents should work on this repository
+## Rules for AI agents
 
-When working on this repository:
+Before modifying this repository:
 
-- inspect the current GitHub/repository state before editing;
-- inspect upstream ARTEMIS and ROOT build configuration when dependency behavior matters;
-- identify the specific cause of a build/runtime problem before making broad changes;
-- prefer targeted fixes over global compiler or dependency changes;
-- preserve working behavior unrelated to the requested change;
-- **prefer AlmaLinux 9 for the foreseeable future; do not migrate to AlmaLinux 10 just because it is newer;**
-- preserve the Docker platform recorded in the current repository unless explicitly changed;
-- **always preserve `-mno-avx -mno-avx2` for Docker-distributed binaries unless the user explicitly changes this requirement;**
-- preserve `/opt/artemis` for installed software and `/work` for writable files;
-- keep ROOT pinned to `v6-32-06` unless a version change is explicitly investigated and requested;
-- preserve the intended ZeroMQ and Redis ARTEMIS configuration unless explicitly changed;
-- keep Docker, Apptainer, README, scripts, paths, image names, CPU target, and CI configuration synchronized;
-- show concrete shell commands for testing;
-- after changing the repository, report exactly which files changed and what should be tested;
-- never claim to have inspected, built, tested, or modified something that was not actually accessible or executed.
+- inspect the latest repository state and latest relevant GitHub Actions run;
+- identify the specific failure before making broad changes;
+- preserve unrelated working behavior;
+- keep Dockerfile, CI, helper scripts, README, image names, filesystem paths, and CPU target synchronized;
+- preserve AlmaLinux 9, ROOT 6.32.06, and `-mno-avx -mno-avx2` unless the user explicitly changes those requirements;
+- preserve ZeroMQ and Redis support unless explicitly changed;
+- test Docker and SIF separately;
+- after editing, report exactly what changed and what remains to verify;
+- never claim something was built, tested, or inspected unless it actually was.
 
-When asked to rebuild or reproduce the image, first inspect the current repository and summarize the build flow and runtime flow before changing anything.
-
-## AI assistants
-
-These instructions are intended for ChatGPT, Codex, and other AI assistants/coding agents. They are not specific to one AI product.
-
-`CHATGPT_REBUILD_PROMPT.md` is intentionally not used in this repository. The repository itself and this `AGENTS.md` file are the authoritative sources for development and maintenance.
+`CHATGPT_REBUILD_PROMPT.md` is intentionally not used. The repository and this `AGENTS.md` are the persistent authoritative hand-off for development.
