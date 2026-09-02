@@ -6,48 +6,80 @@ This repository builds the nuclear-physics ARTEMIS framework from the upstream `
 
 ## Quick start: Docker
 
-Pull the pre-built image from GHCR:
+No repository clone or helper script is required to use the pre-built Docker image.
+
+Pull the image from GHCR:
 
 ```bash
-docker pull --platform linux/amd64 ghcr.io/nobukoba/container-artemis-first-trial:latest
+docker pull --platform linux/amd64 \
+  ghcr.io/nobukoba/container-artemis-first-trial:latest
 ```
 
-Run it with the helper script:
+Run it from the directory containing your analysis files:
 
 ```bash
-IMAGE=ghcr.io/nobukoba/container-artemis-first-trial:latest ./run-docker-container.sh
+docker run --rm -it \
+  --platform linux/amd64 \
+  -v "$PWD:/work" \
+  ghcr.io/nobukoba/container-artemis-first-trial:latest
 ```
 
-A host-side `./work` directory is mounted at `/work` inside the container.
+The current host directory is mounted at `/work` inside the container. ARTEMIS and ROOT are already installed under `/opt/artemis`.
 
-For an interactive container that remains running, use the same helper and, from another terminal, enter it with:
+To verify the installation inside the container:
 
 ```bash
-CONTAINER=container-artemis-first-trial ./login-docker-container.sh
+/opt/artemis/scripts/check-container.sh
 ```
 
 ## Quick start: Apptainer
 
-Download `container-artemis-first-trial.sif` from the repository's `latest` GitHub Release, then run:
+No repository clone is required. Download the rolling latest SIF directly:
 
 ```bash
-SIF=container-artemis-first-trial.sif ./run-apptainer-container.sh
+curl -L -o container-artemis-first-trial.sif \
+  https://github.com/nobukoba/container-artemis-first-trial/releases/download/latest/container-artemis-first-trial.sif
 ```
 
-The helper binds the host `./work` directory to `/work` in the container.
+Run it from the directory containing your analysis files:
 
-You can also build the SIF directly from the GHCR Docker image:
+```bash
+apptainer shell --bind "$PWD:/work" container-artemis-first-trial.sif
+```
+
+The current host directory is available at `/work` inside the container.
+
+You can alternatively build the SIF directly from the GHCR Docker image:
 
 ```bash
 apptainer build container-artemis-first-trial.sif \
   docker://ghcr.io/nobukoba/container-artemis-first-trial:latest
 ```
 
-or use:
+## Optional helper scripts
+
+The repository also contains helper scripts for repeated local use and development. These scripts are available only after cloning the repository:
 
 ```bash
-./build-apptainer-image.sh
+git clone https://github.com/nobukoba/container-artemis-first-trial.git
+cd container-artemis-first-trial
 ```
+
+Docker:
+
+```bash
+IMAGE=ghcr.io/nobukoba/container-artemis-first-trial:latest ./run-docker-container.sh
+```
+
+The Docker helper uses a host-side `./work` directory and mounts it at `/work`. It also configures X11 forwarding where applicable.
+
+Apptainer:
+
+```bash
+SIF=container-artemis-first-trial.sif ./run-apptainer-container.sh
+```
+
+The Apptainer helper similarly mounts host `./work` at `/work`.
 
 ## Container layout
 
@@ -64,17 +96,17 @@ Software installed in the image is kept under:
   scripts/    container helper/check scripts
 ```
 
-The writable user area is:
+The image itself should be treated as immutable. Analysis files, user code, output files, and local builds should normally be placed in the host directory mounted at `/work`.
+
+When the optional helper scripts are used, the repository's host-side `./work` directory is mounted at `/work`; its suggested organization is:
 
 ```text
-/work/
+work/
   src/
   build/
   local/
   scripts/
 ```
-
-The image itself should be treated as immutable. Analysis files, user code, output files, and local builds should normally live below `/work`.
 
 ## Included software
 
@@ -119,13 +151,9 @@ and adds the ARTEMIS and ROOT binaries and libraries to the standard search path
 
 When `/opt/artemis/bin/thisartemis.sh` exists, it is sourced automatically by the login-shell environment.
 
-To verify the installation:
-
-```bash
-/opt/artemis/scripts/check-container.sh
-```
-
 ## Build Docker locally
+
+The following sections are for users who cloned this repository and want to build or maintain the image themselves.
 
 ```bash
 ./build-docker-image.sh
@@ -159,13 +187,9 @@ The distributed image intentionally targets `linux/amd64`, including on an Apple
 
 The Dockerfile explicitly disables AVX and AVX2 code generation so that an image produced by GitHub Actions remains usable on the intended x86-64 hosts.
 
-Run it in the same way:
+The same Quick Start `docker run` command above can be used on Apple Silicon.
 
-```bash
-IMAGE=ghcr.io/nobukoba/container-artemis-first-trial:latest ./run-docker-container.sh
-```
-
-For ROOT/ARTEMIS X11 windows on macOS, an X server such as XQuartz must be running. The helper sets:
+For ROOT/ARTEMIS X11 windows on macOS, an X server such as XQuartz must be running. The optional Docker helper configures:
 
 ```text
 DISPLAY=host.docker.internal:0
@@ -173,9 +197,9 @@ DISPLAY=host.docker.internal:0
 
 ## Linux X11
 
-On Linux, `run-docker-container.sh` forwards the current `DISPLAY` and mounts `/tmp/.X11-unix` when available.
+The basic Quick Start command is intended for terminal use. For X11 applications, additional display/socket forwarding is required.
 
-For Apptainer, `run-apptainer-container.sh` similarly forwards `DISPLAY` and the X11 socket directory.
+After cloning the repository, `run-docker-container.sh` forwards the current `DISPLAY` and mounts `/tmp/.X11-unix` when available. `run-apptainer-container.sh` similarly forwards `DISPLAY` and the X11 socket directory.
 
 ## GitHub Actions
 
