@@ -229,8 +229,114 @@ Both Docker and SIF images are smoke-tested with:
 
 ## For Developers
 
-For development and maintenance of this container, please use **ChatGPT, Codex, or another AI assistant/coding agent** together with the instructions in [`AGENTS.md`](./AGENTS.md).
+This repository is intended to be maintainable with **ChatGPT, Codex, or another AI coding agent**. The authoritative maintenance instructions are in [`AGENTS.md`](./AGENTS.md).
 
-Before modifying the container, ask the AI agent to read `AGENTS.md` and inspect the current repository files. `AGENTS.md` contains the repository-specific build requirements, ROOT compatibility policy, directory layout, Docker/Apptainer workflow, CI behavior, and maintenance guidelines.
+### Start here
 
-`CHATGPT_REBUILD_PROMPT.md` is not used in this repository. The repository itself and `AGENTS.md` are the authoritative sources for development and maintenance.
+Clone the repository and enter it:
+
+```bash
+git clone https://github.com/nobukoba/container-artemis-first-trial.git
+cd container-artemis-first-trial
+```
+
+Before making changes, ask the coding agent to read `AGENTS.md` and inspect the current repository state. For example:
+
+```text
+Read AGENTS.md first. Inspect the current repository and GitHub Actions status before making changes. Preserve all repository requirements in AGENTS.md. Make the necessary fix, update AGENTS.md with important troubleshooting information, commit the change, and check the resulting CI run.
+```
+
+`AGENTS.md` records both the design requirements and troubleshooting history so that work can be continued in a new ChatGPT/Codex session without reconstructing earlier decisions from scratch.
+
+### Important compatibility requirements
+
+Do not casually change the following settings. See `AGENTS.md` for the rationale and current details.
+
+- Keep **AlmaLinux 9** as the base OS for the foreseeable future.
+- Keep ROOT pinned to **6.32.06** (`v6-32-06`) unless a complete compatibility test justifies changing it.
+- Keep the distributed target at **`linux/amd64`**.
+- Preserve **`-mno-avx -mno-avx2`** for distributed binaries.
+- Preserve the repository's ARTEMIS build configuration, including ZeroMQ and Redis support.
+- Treat `/opt/artemis` as image-provided software and `/work` as the writable user/development area.
+- Keep Docker and SIF based on the same software stack; the CI-generated SIF should come from the exact Docker image built by that workflow run.
+
+### Development workflow
+
+A normal maintenance cycle is:
+
+1. Read `AGENTS.md` and inspect the current `Dockerfile`, helper scripts, and workflow.
+2. Make the smallest targeted change needed.
+3. Build/test locally when practical.
+4. Commit and push the change.
+5. Inspect the GitHub Actions **Build Docker and SIF** run.
+6. If CI fails, identify the **first concrete error** in the job log rather than guessing from the final exit code.
+7. Make a targeted fix and repeat until Docker build, Docker smoke test, SIF build, and SIF smoke test all succeed.
+8. Record important compatibility discoveries, failed approaches, and durable decisions in `AGENTS.md`.
+9. Update this README when user-facing commands, supported behavior, or installation/use instructions change.
+
+### CI success criteria
+
+A container change is not considered fully verified merely because the Docker build succeeds. The GitHub Actions workflow should complete all of the following:
+
+```text
+Docker image build
+  -> push to GHCR
+  -> Docker smoke test
+  -> build Apptainer SIF from that Docker image
+  -> SIF smoke test
+  -> upload/publish SIF
+```
+
+The common smoke test is:
+
+```bash
+/opt/artemis/scripts/check-container.sh
+```
+
+### Local development commands
+
+Build the Docker image:
+
+```bash
+./build-docker-image.sh
+```
+
+Increase parallel build jobs when appropriate:
+
+```bash
+NPROC=8 ./build-docker-image.sh
+```
+
+Run the helper-based development container:
+
+```bash
+IMAGE=container-artemis-first-trial:latest ./run-docker-container.sh
+```
+
+Build a local SIF:
+
+```bash
+./build-apptainer-image.sh
+```
+
+Developers should inspect the helper scripts themselves before changing their assumptions about image names, mounts, networking, X11 forwarding, or platform settings.
+
+### Maintaining `AGENTS.md`
+
+Update `AGENTS.md` when a change reveals information that a future maintainer or AI agent should not have to rediscover. In particular, record:
+
+- compatibility constraints and why they exist,
+- dependency/version decisions,
+- build failures and their actual root causes,
+- fixes that were verified by CI,
+- approaches that were tried and should not be repeated,
+- changes to the Docker-to-SIF publication workflow,
+- important directory-layout or runtime assumptions.
+
+Do not fill `AGENTS.md` with transient noise from every CI run. Keep information that is useful for future diagnosis and maintenance.
+
+### README vs. `AGENTS.md`
+
+Keep this README focused on what users and developers need to operate the repository. Put detailed maintenance history, compatibility rationale, debugging records, and AI-agent hand-off information in `AGENTS.md`.
+
+`CHATGPT_REBUILD_PROMPT.md` is not used in this repository. The repository itself, current CI state, and `AGENTS.md` are the authoritative sources for development and maintenance.
