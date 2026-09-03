@@ -131,7 +131,21 @@ CMD ["/bin/bash", "-l"]
 
 `login-docker-container.sh` and the Apptainer helper must also use `/bin/bash -l`.
 
-README must explicitly document `/opt/root`, `/opt/artemis`, `/opt/src`, `/workspace`, the Docker `WORKDIR`, login-shell behavior, `/etc/profile.d/artemis-container.sh`, both initialization scripts, their source order, and the `$PWD:/workspace` mount convention.
+## Apptainer environment isolation
+
+Apptainer should normally be launched with `--cleanenv` for this repository. The purpose is to prevent host-side software environment variables, especially `LD_LIBRARY_PATH`, from leaking into the container and overriding or mixing with the container's own `/opt/root` and `/opt/artemis` installations.
+
+The standard direct invocation is:
+
+```bash
+apptainer exec --cleanenv --bind "$PWD:/workspace" \
+  container-artemis-first-trial.sif \
+  /bin/bash -l
+```
+
+`run-apptainer-container.sh` must include `--cleanenv` by default. Explicitly needed variables such as `DISPLAY` may still be forwarded with `--env`. Do not remove `--cleanenv` merely to preserve arbitrary host software paths; add narrowly scoped `--env` forwarding only when a real runtime requirement is identified.
+
+README must explicitly document `/opt/root`, `/opt/artemis`, `/opt/src`, `/workspace`, the Docker `WORKDIR`, login-shell behavior, `/etc/profile.d/artemis-container.sh`, both initialization scripts, their source order, the `$PWD:/workspace` mount convention, and the default use of Apptainer `--cleanenv`.
 
 ## CI / distribution
 
@@ -174,6 +188,10 @@ ROOT moved from `/opt/artemis/root` to `/opt/root`; ARTEMIS remains `/opt/artemi
 
 The canonical user/development mount point changed from `/work` to `/workspace`. Direct Docker usage is `-v "$PWD:/workspace"`; direct Apptainer usage is `--bind "$PWD:/workspace"`; helper scripts default to mounting the current host directory at `/workspace`; Docker `WORKDIR` is `/workspace`. Keep README, helpers, and Dockerfile synchronized with this convention.
 
+### 2026-09-03: isolate Apptainer from host software environment
+
+A real runtime showed host-side ROOT/NestDAQ library paths leaking into the container through inherited `LD_LIBRARY_PATH`, mixed with Apptainer's own `/.singularity.d/libs` and the container's ROOT/ARTEMIS paths. The repository therefore standardizes on Apptainer `--cleanenv` by default. This is intended to keep the runtime tied to `/opt/root` and `/opt/artemis` rather than whatever ROOT or other software happens to be configured on the host.
+
 ## Diagnosing failures
 
 Use the first concrete error in the exact job log, not the final exit code. Classify failures as CMake configure, compilation, installation, dependency discovery, container startup, runtime smoke test, SIF conversion, or release publishing. A successful Docker build does not imply later smoke/SIF stages succeeded.
@@ -202,6 +220,7 @@ Before modifying this repository:
 - keep Dockerfile, CI, helper scripts, README, image names, paths, and CPU target synchronized;
 - preserve `/opt/root`, `/opt/artemis`, `/opt/src`, and `/workspace` roles;
 - preserve login-shell automatic initialization and source order;
+- preserve Apptainer `--cleanenv` as the default runtime policy unless the user explicitly changes it;
 - preserve AlmaLinux 9, ROOT 6.32.06, `-mno-avx -mno-avx2`, ZeroMQ, and Redis unless explicitly changed;
 - test Docker and SIF separately;
 - report exactly what changed and what remains to verify;
