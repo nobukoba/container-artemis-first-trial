@@ -6,7 +6,7 @@ WORK_DIR="${WORK_DIR:-$PWD}"
 
 mkdir -p "${WORK_DIR}"
 
-args=(exec --bind "${WORK_DIR}:/workspace")
+args=(exec --cleanenv --bind "${WORK_DIR}:/workspace")
 
 if [[ -n "${DISPLAY:-}" ]]; then
   args+=(--env "DISPLAY=${DISPLAY}")
