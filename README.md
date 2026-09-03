@@ -30,12 +30,12 @@ Verify the installation with:
 curl -L -o container-artemis-first-trial.sif \
   https://github.com/nobukoba/container-artemis-first-trial/releases/download/latest/container-artemis-first-trial.sif
 
-apptainer exec --bind "$PWD:/workspace" \
+apptainer exec --cleanenv --bind "$PWD:/workspace" \
   container-artemis-first-trial.sif \
   /bin/bash -l
 ```
 
-The current directory is mounted at `/workspace`. Using `/bin/bash -l` is intentional so the login-shell startup files initialize ROOT and ARTEMIS.
+The current directory is mounted at `/workspace`. `--cleanenv` is intentional: it prevents host-side software environment variables such as `LD_LIBRARY_PATH` from leaking into the container and accidentally overriding `/opt/root` or `/opt/artemis`. Using `/bin/bash -l` is also intentional so the login-shell startup files initialize ROOT and ARTEMIS.
 
 The SIF can also be built directly from GHCR:
 
@@ -130,7 +130,7 @@ To enter an already-running container with the same initialization:
 docker exec -it container-artemis-first-trial /bin/bash -l
 ```
 
-For Apptainer, likewise use `/bin/bash -l` when automatic initialization is expected.
+For Apptainer, use `--cleanenv` together with `/bin/bash -l` when automatic initialization is expected. This keeps the runtime environment container-local while still allowing the requested bind mounts and explicitly forwarded variables such as `DISPLAY`.
 
 ## Optional helper scripts
 
@@ -161,7 +161,7 @@ Apptainer:
 SIF=container-artemis-first-trial.sif ./run-apptainer-container.sh
 ```
 
-The Apptainer helper also mounts the current host directory at `/workspace` and starts `/bin/bash -l`.
+The Apptainer helper mounts the current host directory at `/workspace`, uses `--cleanenv`, explicitly forwards `DISPLAY` when present, and starts `/bin/bash -l`.
 
 ## Included software
 
@@ -239,6 +239,7 @@ Important requirements include:
 - build sources `/opt/src`
 - writable/default user workspace `/workspace`
 - host current directory normally mounted with `-v "$PWD:/workspace"`
+- Apptainer normally launched with `--cleanenv` so host `LD_LIBRARY_PATH` and similar software paths are not inherited
 - login initialization through `/etc/profile.d/artemis-container.sh`
 - source order: `thisroot.sh` then `thisartemis.sh`
 
