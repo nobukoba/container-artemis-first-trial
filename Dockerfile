@@ -9,11 +9,11 @@ ARG HIREDIS_VERSION=v1.1.0
 ARG REDIS_PLUS_PLUS_VERSION=1.3.6
 ARG YAML_CPP_VERSION=0.8.0
 
+ENV ROOTSYS=/opt/root
 ENV ARTEMIS_ROOT=/opt/artemis
-ENV ROOTSYS=/opt/artemis/root
-ENV PATH=/opt/artemis/bin:/opt/artemis/root/bin:${PATH}
-ENV LD_LIBRARY_PATH=/opt/artemis/lib:/opt/artemis/lib64:/opt/artemis/root/lib
-ENV CMAKE_PREFIX_PATH=/opt/artemis:/opt/artemis/root
+ENV PATH=/opt/artemis/bin:/opt/root/bin:${PATH}
+ENV LD_LIBRARY_PATH=/opt/artemis/lib:/opt/artemis/lib64:/opt/root/lib
+ENV CMAKE_PREFIX_PATH=/opt/artemis:/opt/root
 ENV PKG_CONFIG_PATH=/opt/artemis/lib/pkgconfig:/opt/artemis/lib64/pkgconfig
 ENV CFLAGS="-O2 -march=x86-64 -mtune=generic -mno-avx -mno-avx2"
 ENV CXXFLAGS="-O2 -march=x86-64 -mtune=generic -mno-avx -mno-avx2"
@@ -37,7 +37,8 @@ RUN dnf -y update && \
     dnf clean all && rm -rf /var/cache/dnf
 
 RUN mkdir -p \
-      ${ARTEMIS_ROOT}/src \
+      /opt/src \
+      ${ROOTSYS} \
       ${ARTEMIS_ROOT}/bin \
       ${ARTEMIS_ROOT}/include \
       ${ARTEMIS_ROOT}/lib \
@@ -46,7 +47,7 @@ RUN mkdir -p \
       /work/src /work/build /work/local /work/scripts && \
     chmod 1777 /work
 
-RUN cd ${ARTEMIS_ROOT}/src && \
+RUN cd /opt/src && \
     git clone --depth 1 --branch ${ROOT_VERSION} https://github.com/root-project/root.git && \
     cmake -S root -B root-build \
       -DCMAKE_BUILD_TYPE=Release \
@@ -71,7 +72,7 @@ RUN cd ${ARTEMIS_ROOT}/src && \
     cmake --build root-build -j${NPROC} && \
     cmake --install root-build
 
-RUN cd ${ARTEMIS_ROOT}/src && \
+RUN cd /opt/src && \
     git clone --depth 1 --branch ${YAML_CPP_VERSION} https://github.com/jbeder/yaml-cpp.git && \
     cmake -S yaml-cpp -B yaml-cpp/build \
       -DCMAKE_BUILD_TYPE=Release \
@@ -83,7 +84,7 @@ RUN cd ${ARTEMIS_ROOT}/src && \
     cmake --build yaml-cpp/build -j${NPROC} && \
     cmake --install yaml-cpp/build
 
-RUN cd ${ARTEMIS_ROOT}/src && \
+RUN cd /opt/src && \
     git clone --depth 1 --branch ${LIBZMQ_VERSION} https://github.com/zeromq/libzmq.git && \
     cmake -S libzmq -B libzmq/build \
       -DCMAKE_BUILD_TYPE=Release \
@@ -94,13 +95,13 @@ RUN cd ${ARTEMIS_ROOT}/src && \
     cmake --build libzmq/build -j${NPROC} && \
     cmake --install libzmq/build
 
-RUN cd ${ARTEMIS_ROOT}/src && \
+RUN cd /opt/src && \
     git clone --depth 1 --branch ${HIREDIS_VERSION} https://github.com/redis/hiredis.git && \
     make -C hiredis -j${NPROC} PREFIX=${ARTEMIS_ROOT} LIBRARY_PATH=lib && \
     make -C hiredis PREFIX=${ARTEMIS_ROOT} LIBRARY_PATH=lib install && \
     test -e ${ARTEMIS_ROOT}/lib/libhiredis.so
 
-RUN cd ${ARTEMIS_ROOT}/src && \
+RUN cd /opt/src && \
     git clone --depth 1 --branch ${REDIS_PLUS_PLUS_VERSION} https://github.com/sewenew/redis-plus-plus.git && \
     sed -i '/#include "cxx_utils.h"/i #include <cstdint>' redis-plus-plus/src/sw/redis++/utils.h && \
     cmake -S redis-plus-plus -B redis-plus-plus/build \
@@ -115,7 +116,7 @@ RUN cd ${ARTEMIS_ROOT}/src && \
     cmake --build redis-plus-plus/build -j${NPROC} && \
     cmake --install redis-plus-plus/build
 
-RUN cd ${ARTEMIS_ROOT}/src && \
+RUN cd /opt/src && \
     git clone --depth 1 --branch ${ARTEMIS_BRANCH} https://github.com/artemis-dev/artemis.git && \
     cmake -S artemis -B artemis/build \
       -DCMAKE_BUILD_TYPE=Release \
@@ -128,25 +129,28 @@ RUN cd ${ARTEMIS_ROOT}/src && \
     cmake --install artemis/build
 
 RUN cat > /etc/profile.d/artemis-container.sh <<'EOF'
+export ROOTSYS=/opt/root
 export ARTEMIS_ROOT=/opt/artemis
-export ROOTSYS=/opt/artemis/root
-export PATH=/opt/artemis/bin:/opt/artemis/root/bin:${PATH}
-export LD_LIBRARY_PATH=/opt/artemis/lib:/opt/artemis/lib64:/opt/artemis/root/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-export CMAKE_PREFIX_PATH=/opt/artemis:/opt/artemis/root${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}
-export PKG_CONFIG_PATH=/opt/artemis/lib/pkgconfig:/opt/artemis/lib64/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}
+if [ -r /opt/root/bin/thisroot.sh ]; then
+  source /opt/root/bin/thisroot.sh
+fi
 if [ -r /opt/artemis/bin/thisartemis.sh ]; then
   source /opt/artemis/bin/thisartemis.sh
 fi
+export CMAKE_PREFIX_PATH=/opt/artemis:/opt/root${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}
+export PKG_CONFIG_PATH=/opt/artemis/lib/pkgconfig:/opt/artemis/lib64/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}
 EOF
 
 COPY scripts/ ${ARTEMIS_ROOT}/scripts/
 RUN chmod -R a+rX ${ARTEMIS_ROOT}/scripts && \
     find ${ARTEMIS_ROOT}/scripts -type f -name '*.sh' -exec chmod a+x {} + && \
-    printf '%s\n' '/opt/artemis/lib' '/opt/artemis/lib64' '/opt/artemis/root/lib' \
+    printf '%s\n' '/opt/artemis/lib' '/opt/artemis/lib64' '/opt/root/lib' \
       > /etc/ld.so.conf.d/artemis.conf && \
     ldconfig && \
+    test -r /opt/root/bin/thisroot.sh && \
     root-config --version && \
     test -x ${ARTEMIS_ROOT}/bin/artemis && \
+    test -r ${ARTEMIS_ROOT}/bin/thisartemis.sh && \
     (${ARTEMIS_ROOT}/bin/artemis --help >/dev/null 2>&1 || true)
 
 WORKDIR /work
