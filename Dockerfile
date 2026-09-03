@@ -44,8 +44,8 @@ RUN mkdir -p \
       ${ARTEMIS_ROOT}/lib \
       ${ARTEMIS_ROOT}/lib64 \
       ${ARTEMIS_ROOT}/scripts \
-      /work/src /work/build /work/local /work/scripts && \
-    chmod 1777 /work
+      /workspace && \
+    chmod 1777 /workspace
 
 RUN cd /opt/src && \
     git clone --depth 1 --branch ${ROOT_VERSION} https://github.com/root-project/root.git && \
@@ -54,79 +54,31 @@ RUN cd /opt/src && \
       -DCMAKE_INSTALL_PREFIX=${ROOTSYS} \
       -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG -march=x86-64 -mtune=generic -mno-avx -mno-avx2" \
       -DCMAKE_CXX_FLAGS_RELEASE="-O2 -DNDEBUG -march=x86-64 -mtune=generic -mno-avx -mno-avx2" \
-      -Dgnuinstall=ON \
-      -Dtesting=OFF \
-      -Dtmva=ON \
-      -Droofit=OFF \
-      -Dpyroot=OFF \
-      -Dwebgui=OFF \
-      -Dxrootd=OFF \
-      -Ddavix=OFF \
-      -Dmysql=OFF \
-      -Dpgsql=OFF \
-      -Dodbc=OFF \
-      -Dsqlite=ON \
-      -Dssl=ON \
-      -Dx11=ON \
-      -Dopengl=ON && \
-    cmake --build root-build -j${NPROC} && \
-    cmake --install root-build
+      -Dgnuinstall=ON -Dtesting=OFF -Dtmva=ON -Droofit=OFF -Dpyroot=OFF \
+      -Dwebgui=OFF -Dxrootd=OFF -Ddavix=OFF -Dmysql=OFF -Dpgsql=OFF \
+      -Dodbc=OFF -Dsqlite=ON -Dssl=ON -Dx11=ON -Dopengl=ON && \
+    cmake --build root-build -j${NPROC} && cmake --install root-build
 
-RUN cd /opt/src && \
-    git clone --depth 1 --branch ${YAML_CPP_VERSION} https://github.com/jbeder/yaml-cpp.git && \
-    cmake -S yaml-cpp -B yaml-cpp/build \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} \
-      -DCMAKE_INSTALL_LIBDIR=lib \
-      -DYAML_BUILD_SHARED_LIBS=ON \
-      -DYAML_CPP_BUILD_TESTS=OFF \
-      -DYAML_CPP_BUILD_TOOLS=OFF && \
-    cmake --build yaml-cpp/build -j${NPROC} && \
-    cmake --install yaml-cpp/build
+RUN cd /opt/src && git clone --depth 1 --branch ${YAML_CPP_VERSION} https://github.com/jbeder/yaml-cpp.git && \
+    cmake -S yaml-cpp -B yaml-cpp/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} -DCMAKE_INSTALL_LIBDIR=lib -DYAML_BUILD_SHARED_LIBS=ON -DYAML_CPP_BUILD_TESTS=OFF -DYAML_CPP_BUILD_TOOLS=OFF && \
+    cmake --build yaml-cpp/build -j${NPROC} && cmake --install yaml-cpp/build
 
-RUN cd /opt/src && \
-    git clone --depth 1 --branch ${LIBZMQ_VERSION} https://github.com/zeromq/libzmq.git && \
-    cmake -S libzmq -B libzmq/build \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} \
-      -DCMAKE_INSTALL_LIBDIR=lib \
-      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-      -DBUILD_TESTS=OFF -DENABLE_DRAFTS=OFF && \
-    cmake --build libzmq/build -j${NPROC} && \
-    cmake --install libzmq/build
+RUN cd /opt/src && git clone --depth 1 --branch ${LIBZMQ_VERSION} https://github.com/zeromq/libzmq.git && \
+    cmake -S libzmq -B libzmq/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_TESTS=OFF -DENABLE_DRAFTS=OFF && \
+    cmake --build libzmq/build -j${NPROC} && cmake --install libzmq/build
 
-RUN cd /opt/src && \
-    git clone --depth 1 --branch ${HIREDIS_VERSION} https://github.com/redis/hiredis.git && \
+RUN cd /opt/src && git clone --depth 1 --branch ${HIREDIS_VERSION} https://github.com/redis/hiredis.git && \
     make -C hiredis -j${NPROC} PREFIX=${ARTEMIS_ROOT} LIBRARY_PATH=lib && \
-    make -C hiredis PREFIX=${ARTEMIS_ROOT} LIBRARY_PATH=lib install && \
-    test -e ${ARTEMIS_ROOT}/lib/libhiredis.so
+    make -C hiredis PREFIX=${ARTEMIS_ROOT} LIBRARY_PATH=lib install && test -e ${ARTEMIS_ROOT}/lib/libhiredis.so
 
-RUN cd /opt/src && \
-    git clone --depth 1 --branch ${REDIS_PLUS_PLUS_VERSION} https://github.com/sewenew/redis-plus-plus.git && \
+RUN cd /opt/src && git clone --depth 1 --branch ${REDIS_PLUS_PLUS_VERSION} https://github.com/sewenew/redis-plus-plus.git && \
     sed -i '/#include "cxx_utils.h"/i #include <cstdint>' redis-plus-plus/src/sw/redis++/utils.h && \
-    cmake -S redis-plus-plus -B redis-plus-plus/build \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} \
-      -DCMAKE_INSTALL_LIBDIR=lib \
-      -DCMAKE_PREFIX_PATH=${ARTEMIS_ROOT} \
-      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-      -DREDIS_PLUS_PLUS_CXX_STANDARD=17 \
-      -DREDIS_PLUS_PLUS_BUILD_TEST=OFF \
-      -DREDIS_PLUS_PLUS_BUILD_STATIC=OFF && \
-    cmake --build redis-plus-plus/build -j${NPROC} && \
-    cmake --install redis-plus-plus/build
+    cmake -S redis-plus-plus -B redis-plus-plus/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_PREFIX_PATH=${ARTEMIS_ROOT} -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DREDIS_PLUS_PLUS_CXX_STANDARD=17 -DREDIS_PLUS_PLUS_BUILD_TEST=OFF -DREDIS_PLUS_PLUS_BUILD_STATIC=OFF && \
+    cmake --build redis-plus-plus/build -j${NPROC} && cmake --install redis-plus-plus/build
 
-RUN cd /opt/src && \
-    git clone --depth 1 --branch ${ARTEMIS_BRANCH} https://github.com/artemis-dev/artemis.git && \
-    cmake -S artemis -B artemis/build \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} \
-      -DCMAKE_PREFIX_PATH="${ARTEMIS_ROOT};${ROOTSYS}" \
-      -DBUILD_GET=OFF \
-      -DBUILD_WITH_ZMQ=ON \
-      -DBUILD_WITH_REDIS=ON && \
-    cmake --build artemis/build -j${NPROC} --verbose && \
-    cmake --install artemis/build
+RUN cd /opt/src && git clone --depth 1 --branch ${ARTEMIS_BRANCH} https://github.com/artemis-dev/artemis.git && \
+    cmake -S artemis -B artemis/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${ARTEMIS_ROOT} -DCMAKE_PREFIX_PATH="${ARTEMIS_ROOT};${ROOTSYS}" -DBUILD_GET=OFF -DBUILD_WITH_ZMQ=ON -DBUILD_WITH_REDIS=ON && \
+    cmake --build artemis/build -j${NPROC} --verbose && cmake --install artemis/build
 
 RUN cat > /etc/profile.d/artemis-container.sh <<'EOF'
 export ROOTSYS=/opt/root
@@ -144,14 +96,10 @@ EOF
 COPY scripts/ ${ARTEMIS_ROOT}/scripts/
 RUN chmod -R a+rX ${ARTEMIS_ROOT}/scripts && \
     find ${ARTEMIS_ROOT}/scripts -type f -name '*.sh' -exec chmod a+x {} + && \
-    printf '%s\n' '/opt/artemis/lib' '/opt/artemis/lib64' '/opt/root/lib' \
-      > /etc/ld.so.conf.d/artemis.conf && \
-    ldconfig && \
-    test -r /opt/root/bin/thisroot.sh && \
-    root-config --version && \
-    test -x ${ARTEMIS_ROOT}/bin/artemis && \
-    test -r ${ARTEMIS_ROOT}/bin/thisartemis.sh && \
+    printf '%s\n' '/opt/artemis/lib' '/opt/artemis/lib64' '/opt/root/lib' > /etc/ld.so.conf.d/artemis.conf && \
+    ldconfig && test -r /opt/root/bin/thisroot.sh && root-config --version && \
+    test -x ${ARTEMIS_ROOT}/bin/artemis && test -r ${ARTEMIS_ROOT}/bin/thisartemis.sh && \
     (${ARTEMIS_ROOT}/bin/artemis --help >/dev/null 2>&1 || true)
 
-WORKDIR /work
+WORKDIR /workspace
 CMD ["/bin/bash", "-l"]
