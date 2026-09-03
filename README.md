@@ -8,8 +8,6 @@ This repository builds the nuclear-physics ARTEMIS framework from the upstream `
 
 No repository clone or helper script is required to use the pre-built Docker image.
 
-Pull the image from GHCR:
-
 ```bash
 docker pull --platform linux/amd64 \
   ghcr.io/nobukoba/container-artemis-first-trial:latest
@@ -24,9 +22,11 @@ docker run --rm -it \
   ghcr.io/nobukoba/container-artemis-first-trial:latest
 ```
 
-The current host directory is mounted at `/work` inside the container. ARTEMIS and ROOT are already installed under `/opt/artemis`.
+The container starts `/bin/bash -l`, so it opens a **login shell**. ROOT and ARTEMIS are initialized automatically and are ready to use immediately.
 
-To verify the installation inside the container:
+The current host directory is mounted at `/work` inside the container.
+
+To verify the installation:
 
 ```bash
 /opt/artemis/scripts/check-container.sh
@@ -34,20 +34,22 @@ To verify the installation inside the container:
 
 ## Quick start: Apptainer
 
-No repository clone is required. Download the rolling latest SIF directly:
+Download the rolling latest SIF directly:
 
 ```bash
 curl -L -o container-artemis-first-trial.sif \
   https://github.com/nobukoba/container-artemis-first-trial/releases/download/latest/container-artemis-first-trial.sif
 ```
 
-Run it from the directory containing your analysis files:
+Start a login shell and bind the current directory to `/work`:
 
 ```bash
-apptainer shell --bind "$PWD:/work" container-artemis-first-trial.sif
+apptainer exec --bind "$PWD:/work" \
+  container-artemis-first-trial.sif \
+  /bin/bash -l
 ```
 
-The current host directory is available at `/work` inside the container.
+Using `/bin/bash -l` is intentional: the login-shell startup files initialize ROOT and ARTEMIS automatically.
 
 You can alternatively build the SIF directly from the GHCR Docker image:
 
@@ -56,9 +58,106 @@ apptainer build container-artemis-first-trial.sif \
   docker://ghcr.io/nobukoba/container-artemis-first-trial:latest
 ```
 
+## Installation and directory layout
+
+CERN ROOT and ARTEMIS use separate installation prefixes.
+
+```text
+/opt/
+├── root/                 CERN ROOT installation
+│   ├── bin/
+│   │   └── thisroot.sh
+│   ├── include/
+│   ├── lib/
+│   └── ...
+│
+├── artemis/              ARTEMIS installation and its supporting libraries
+│   ├── bin/
+│   │   ├── artemis
+│   │   └── thisartemis.sh
+│   ├── include/
+│   ├── lib/
+│   ├── lib64/
+│   └── scripts/
+│       └── check-container.sh
+│
+└── src/                  source trees used to build the image
+    ├── root/
+    ├── root-build/
+    ├── artemis/
+    ├── yaml-cpp/
+    ├── libzmq/
+    ├── hiredis/
+    └── redis-plus-plus/
+
+/work/                    writable user area
+├── src/
+├── build/
+├── local/
+└── scripts/
+```
+
+The important distinction is:
+
+```text
+CERN ROOT  -> /opt/root
+ARTEMIS    -> /opt/artemis
+user files -> /work
+```
+
+`/opt/root` and `/opt/artemis` are image-provided software and should normally be treated as immutable. Analysis files, user code, output files, and local builds should live under `/work`.
+
+## Login shell initialization
+
+The container is configured so a Bash **login shell** automatically initializes both CERN ROOT and ARTEMIS.
+
+The Docker image contains:
+
+```text
+/etc/profile.d/artemis-container.sh
+```
+
+A Bash login shell reads `/etc/profile`, which in turn reads the scripts under `/etc/profile.d/`. `artemis-container.sh` initializes the environment in this order:
+
+```bash
+source /opt/root/bin/thisroot.sh
+source /opt/artemis/bin/thisartemis.sh
+```
+
+The order is intentional: ROOT is initialized first, then ARTEMIS.
+
+The same profile script also establishes the container-specific installation prefixes:
+
+```bash
+ROOTSYS=/opt/root
+ARTEMIS_ROOT=/opt/artemis
+CMAKE_PREFIX_PATH=/opt/artemis:/opt/root
+PKG_CONFIG_PATH=/opt/artemis/lib/pkgconfig:/opt/artemis/lib64/pkgconfig
+```
+
+The standard Docker command works automatically because the Dockerfile uses:
+
+```text
+CMD ["/bin/bash", "-l"]
+```
+
+When entering an already-running Docker container, also use a login shell:
+
+```bash
+docker exec -it container-artemis-first-trial /bin/bash -l
+```
+
+For Apptainer, use:
+
+```bash
+apptainer exec container-artemis-first-trial.sif /bin/bash -l
+```
+
+instead of relying on a non-login interactive shell if you want the automatic ROOT/ARTEMIS initialization.
+
 ## Optional helper scripts
 
-The repository also contains helper scripts for repeated local use and development. These scripts are available only after cloning the repository:
+The repository contains helper scripts for repeated local use and development. These are available after cloning the repository:
 
 ```bash
 git clone https://github.com/nobukoba/container-artemis-first-trial.git
@@ -71,7 +170,15 @@ Docker:
 IMAGE=ghcr.io/nobukoba/container-artemis-first-trial:latest ./run-docker-container.sh
 ```
 
-The Docker helper uses a host-side `./work` directory and mounts it at `/work`. It also configures X11 forwarding where applicable.
+The Docker helper mounts host `./work` at `/work` and starts the container's login shell.
+
+To enter an already-running helper container:
+
+```bash
+./login-docker-container.sh
+```
+
+`login-docker-container.sh` uses `bash -l`, so ROOT and ARTEMIS are initialized again for that shell.
 
 Apptainer:
 
@@ -79,53 +186,26 @@ Apptainer:
 SIF=container-artemis-first-trial.sif ./run-apptainer-container.sh
 ```
 
-The Apptainer helper similarly mounts host `./work` at `/work`.
-
-## Container layout
-
-Software installed in the image is kept under:
-
-```text
-/opt/artemis/
-  root/       ROOT installation
-  src/        source trees
-  bin/        ARTEMIS and dependency binaries
-  include/    headers
-  lib/        libraries
-  lib64/      libraries when used by a package
-  scripts/    container helper/check scripts
-```
-
-The image itself should be treated as immutable. Analysis files, user code, output files, and local builds should normally be placed in the host directory mounted at `/work`.
-
-When the optional helper scripts are used, the repository's host-side `./work` directory is mounted at `/work`; its suggested organization is:
-
-```text
-work/
-  src/
-  build/
-  local/
-  scripts/
-```
+The Apptainer helper also starts `/bin/bash -l` and mounts host `./work` at `/work`.
 
 ## Included software
 
 The intended base environment is **AlmaLinux 9**.
 
-AlmaLinux 9 is intentionally preferred for the foreseeable future. This container combines ARTEMIS, ROOT, and several supporting C/C++ libraries, and for this environment build stability and compatibility are more important than adopting the newest major OS release. Moving to AlmaLinux 10 also changes the compiler and system-library environment and can expose additional build or source-compatibility problems in ROOT, ARTEMIS, or their dependencies. Therefore, AlmaLinux 10 should not be adopted simply because it is newer; a future migration should be made only after the complete software stack has been tested successfully and there is a concrete benefit to the change.
+AlmaLinux 9 is intentionally preferred for the foreseeable future. Build stability and compatibility with the ARTEMIS/ROOT stack are more important than moving to a newer major OS release simply because it is newer.
 
 The image builds and installs:
 
 - AlmaLinux 9 base environment
-- ROOT **6.32.06** (`v6-32-06`)
-- ARTEMIS (`artemis-dev/artemis`, `develop` branch by default)
+- CERN ROOT **6.32.06** (`v6-32-06`) under `/opt/root`
+- ARTEMIS (`artemis-dev/artemis`, `develop`) under `/opt/artemis`
 - yaml-cpp
 - ZeroMQ / libzmq
 - hiredis
 - redis-plus-plus
 - OpenMPI development environment
 
-ROOT is intentionally pinned rather than tracking the newest ROOT release automatically. ARTEMIS compatibility is more important than using the newest ROOT version. Any ROOT-version change should be treated as a compatibility change and tested explicitly with ARTEMIS.
+ROOT is intentionally pinned. Any ROOT-version change should be treated as a compatibility change and tested explicitly with ARTEMIS.
 
 ARTEMIS is configured with:
 
@@ -135,45 +215,23 @@ BUILD_WITH_ZMQ=ON
 BUILD_WITH_REDIS=ON
 ```
 
-This keeps the container suitable for future NestDAQ/online integration work using ZeroMQ and Redis.
-
-## Environment
-
-The container sets:
-
-```bash
-ARTEMIS_ROOT=/opt/artemis
-ROOTSYS=/opt/artemis/root
-CMAKE_PREFIX_PATH=/opt/artemis:/opt/artemis/root
-```
-
-and adds the ARTEMIS and ROOT binaries and libraries to the standard search paths.
-
-When `/opt/artemis/bin/thisartemis.sh` exists, it is sourced automatically by the login-shell environment.
-
 ## Build Docker locally
 
-The following sections are for users who cloned this repository and want to build or maintain the image themselves.
+The following is for users who cloned this repository and want to build or maintain the image themselves.
 
 ```bash
 ./build-docker-image.sh
 ```
 
-The helper builds for:
+The helper builds for `linux/amd64` and creates timestamped and `latest` tags.
 
-```text
-linux/amd64
-```
-
-and creates both timestamped and `latest` tags.
-
-The distributed binaries use the baseline CPU target:
+The distributed binaries use:
 
 ```text
 -O2 -march=x86-64 -mtune=generic -mno-avx -mno-avx2
 ```
 
-`-mno-avx -mno-avx2` are intentionally mandatory for Docker-distributed binaries in this repository.
+`-mno-avx -mno-avx2` are intentionally mandatory for distributed binaries in this repository.
 
 The default parallelism is four jobs. Override it when necessary:
 
@@ -183,11 +241,7 @@ NPROC=8 ./build-docker-image.sh
 
 ## Apple Silicon Mac
 
-The distributed image intentionally targets `linux/amd64`, including on an Apple Silicon Mac. Docker Desktop therefore runs it through its amd64 compatibility/emulation path.
-
-The Dockerfile explicitly disables AVX and AVX2 code generation so that an image produced by GitHub Actions remains usable on the intended x86-64 hosts.
-
-The same Quick Start `docker run` command above can be used on Apple Silicon.
+The distributed image intentionally targets `linux/amd64`, including on Apple Silicon. Docker Desktop therefore runs it through its amd64 compatibility/emulation path.
 
 For ROOT/ARTEMIS X11 windows on macOS, an X server such as XQuartz must be running. The optional Docker helper configures:
 
@@ -203,29 +257,29 @@ After cloning the repository, `run-docker-container.sh` forwards the current `DI
 
 ## GitHub Actions
 
-`.github/workflows/docker.yml` builds the Docker image and pushes:
+`.github/workflows/docker.yml` builds and pushes:
 
 ```text
 ghcr.io/nobukoba/container-artemis-first-trial:latest
 ghcr.io/nobukoba/container-artemis-first-trial:<UTC timestamp>
 ```
 
-The workflow then builds the Apptainer SIF from the exact timestamped GHCR Docker image. This ensures that the Docker and SIF artifacts contain the same software stack.
+The workflow then builds the Apptainer SIF from the exact timestamped GHCR Docker image, so Docker and SIF contain the same software stack.
 
-The workflow publishes:
+It publishes:
 
 ```text
 container-artemis-first-trial.sif
 container-artemis-first-trial-<UTC timestamp>.sif
 ```
 
-as GitHub Actions artifacts and as assets of the rolling `latest` GitHub Release.
-
-Both Docker and SIF images are smoke-tested with:
+Both Docker and SIF are smoke-tested with:
 
 ```bash
 /opt/artemis/scripts/check-container.sh
 ```
+
+A successful smoke test also verifies the `/opt/root` and `/opt/artemis` prefixes and that a Bash login shell can find both `root-config` and `artemis`.
 
 ## For Developers
 
@@ -233,50 +287,47 @@ This repository is intended to be maintainable with **ChatGPT, Codex, or another
 
 ### Start here
 
-Clone the repository and enter it:
-
 ```bash
 git clone https://github.com/nobukoba/container-artemis-first-trial.git
 cd container-artemis-first-trial
 ```
 
-Before making changes, ask the coding agent to read `AGENTS.md` and inspect the current repository state. For example:
+Before making changes, ask the coding agent to read `AGENTS.md` and inspect the current repository and CI state. For example:
 
 ```text
 Read AGENTS.md first. Inspect the current repository and GitHub Actions status before making changes. Preserve all repository requirements in AGENTS.md. Make the necessary fix, update AGENTS.md with important troubleshooting information, commit the change, and check the resulting CI run.
 ```
 
-`AGENTS.md` records both the design requirements and troubleshooting history so that work can be continued in a new ChatGPT/Codex session without reconstructing earlier decisions from scratch.
+### Important compatibility and layout requirements
 
-### Important compatibility requirements
+Do not casually change these settings:
 
-Do not casually change the following settings. See `AGENTS.md` for the rationale and current details.
-
-- Keep **AlmaLinux 9** as the base OS for the foreseeable future.
-- Keep ROOT pinned to **6.32.06** (`v6-32-06`) unless a complete compatibility test justifies changing it.
-- Keep the distributed target at **`linux/amd64`**.
-- Preserve **`-mno-avx -mno-avx2`** for distributed binaries.
-- Preserve the repository's ARTEMIS build configuration, including ZeroMQ and Redis support.
-- Treat `/opt/artemis` as image-provided software and `/work` as the writable user/development area.
-- Keep Docker and SIF based on the same software stack; the CI-generated SIF should come from the exact Docker image built by that workflow run.
+- AlmaLinux 9
+- ROOT 6.32.06 (`v6-32-06`)
+- `linux/amd64`
+- `-mno-avx -mno-avx2`
+- ARTEMIS ZeroMQ and Redis support
+- CERN ROOT installation prefix: `/opt/root`
+- ARTEMIS installation prefix: `/opt/artemis`
+- writable user area: `/work`
+- login-shell initialization through `/etc/profile.d/artemis-container.sh`
+- initialization order: `thisroot.sh` first, `thisartemis.sh` second
 
 ### Development workflow
 
 A normal maintenance cycle is:
 
-1. Read `AGENTS.md` and inspect the current `Dockerfile`, helper scripts, and workflow.
+1. Read `AGENTS.md` and inspect the current `Dockerfile`, helper scripts, README, and workflow.
 2. Make the smallest targeted change needed.
 3. Build/test locally when practical.
-4. Commit and push the change.
+4. Commit and push.
 5. Inspect the GitHub Actions **Build Docker and SIF** run.
-6. If CI fails, identify the **first concrete error** in the job log rather than guessing from the final exit code.
-7. Make a targeted fix and repeat until Docker build, Docker smoke test, SIF build, and SIF smoke test all succeed.
-8. Record important compatibility discoveries, failed approaches, and durable decisions in `AGENTS.md`.
-9. Update this README when user-facing commands, supported behavior, or installation/use instructions change.
+6. On failure, identify the first concrete error in the job log.
+7. Repeat until Docker build, Docker smoke test, SIF build, and SIF smoke test all succeed.
+8. Record durable compatibility discoveries and troubleshooting information in `AGENTS.md`.
+9. Keep README commands, install prefixes, login-shell behavior, helper scripts, and CI synchronized.
 
-### CI success criteria
-
-A container change is not considered fully verified merely because the Docker build succeeds. The GitHub Actions workflow should complete all of the following:
+A container change is fully verified only after:
 
 ```text
 Docker image build
@@ -287,56 +338,10 @@ Docker image build
   -> upload/publish SIF
 ```
 
-The common smoke test is:
-
-```bash
-/opt/artemis/scripts/check-container.sh
-```
-
-### Local development commands
-
-Build the Docker image:
-
-```bash
-./build-docker-image.sh
-```
-
-Increase parallel build jobs when appropriate:
-
-```bash
-NPROC=8 ./build-docker-image.sh
-```
-
-Run the helper-based development container:
-
-```bash
-IMAGE=container-artemis-first-trial:latest ./run-docker-container.sh
-```
-
-Build a local SIF:
-
-```bash
-./build-apptainer-image.sh
-```
-
-Developers should inspect the helper scripts themselves before changing their assumptions about image names, mounts, networking, X11 forwarding, or platform settings.
-
 ### Maintaining `AGENTS.md`
 
-Update `AGENTS.md` when a change reveals information that a future maintainer or AI agent should not have to rediscover. In particular, record:
+Update `AGENTS.md` when future maintainers should not have to rediscover a compatibility constraint, dependency decision, build failure root cause, verified fix, directory-layout assumption, or CI/publication behavior.
 
-- compatibility constraints and why they exist,
-- dependency/version decisions,
-- build failures and their actual root causes,
-- fixes that were verified by CI,
-- approaches that were tried and should not be repeated,
-- changes to the Docker-to-SIF publication workflow,
-- important directory-layout or runtime assumptions.
+Keep this README focused on user/developer operation. Put detailed maintenance history and AI-agent hand-off information in `AGENTS.md`.
 
-Do not fill `AGENTS.md` with transient noise from every CI run. Keep information that is useful for future diagnosis and maintenance.
-
-### README vs. `AGENTS.md`
-
-Keep this README focused on what users and developers need to operate the repository. Put detailed maintenance history, compatibility rationale, debugging records, and AI-agent hand-off information in `AGENTS.md`.
-
-`CHATGPT_REBUILD_PROMPT.md` is not used in this repository. The repository itself, current CI state, and `AGENTS.md` are the authoritative sources for development and maintenance.
+`CHATGPT_REBUILD_PROMPT.md` is not used. The repository, current CI state, and `AGENTS.md` are the authoritative sources for development and maintenance.
