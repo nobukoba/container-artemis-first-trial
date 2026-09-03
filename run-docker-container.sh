@@ -2,7 +2,7 @@
 set -euo pipefail
 
 IMAGE="${IMAGE:-container-artemis-first-trial:latest}"
-WORK_DIR="${WORK_DIR:-$PWD/work}"
+WORK_DIR="${WORK_DIR:-$PWD}"
 
 mkdir -p "${WORK_DIR}"
 
@@ -11,7 +11,7 @@ docker_args=(
   --name container-artemis-first-trial
   --platform linux/amd64/v2
   --network host
-  -v "${WORK_DIR}:/work"
+  -v "${WORK_DIR}:/workspace"
 )
 
 case "$(uname -s)" in
